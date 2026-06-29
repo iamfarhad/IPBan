@@ -2,11 +2,81 @@ name: CI
 
 on:
   push:
+    branches: ["**"]
   pull_request:
 
 jobs:
-  validate:
+  # ── 1. Static analysis ───────────────────────────────────────────────────────
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Repository status
-        run: echo "CI placeholder"
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check
+        run: bash -n ipban.sh
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: ShellCheck
+        run: |
+          shellcheck \
+            --severity=warning \
+            --exclude=SC1091 \
+            ipban.sh
+
+  # ── 2. Input-validation unit tests (no root / no iptables needed) ────────────
+  unit:
+    name: Unit tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: sudo bash tests/unit.sh
+
+  # ── 3. Full integration (real iptables + xt_geoip via xtables-addons-dkms) ──
+  integration:
+    name: Integration / ${{ matrix.os }}
+    needs: unit
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install iptables and xtables-addons
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            "linux-headers-$(uname -r)" \
+            iptables \
+            netfilter-persistent \
+            iptables-persistent \
+            curl \
+            gzip \
+            tar \
+            perl \
+            xtables-addons-common \
+            xtables-addons-dkms \
+            libtext-csv-xs-perl \
+            libmoosex-types-netaddr-ip-perl \
+            libnet-cidr-lite-perl
+
+      - name: Load kernel modules
+        run: |
+          sudo modprobe x_tables  || true
+          sudo modprobe xt_geoip  || true
+          echo "Loaded modules:"
+          lsmod | grep -E "x_tables|xt_geoip" || echo "(none matched — geoip tests will be skipped)"
+
+      - name: Build minimal test GeoIP database
+        run: sudo bash tests/build-test-geoip.sh
+
+      - name: Run integration tests
+        run: sudo bash tests/integration.sh
