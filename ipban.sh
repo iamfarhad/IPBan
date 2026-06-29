@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# IPBan v6.0 — github.com/iamfarhad/IPBan
+# IPBan v1.0.0 — github.com/iamfarhad/IPBan
 # Ubuntu ≥20 · Debian ≥11 · CentOS Stream 8+ · RHEL 8+ · Fedora
 # Usage: ipban.sh -add INPUT,OUTPUT -geoip CN,IR -limit DROP [-icmp no]
 set -Eeuo pipefail
