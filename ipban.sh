@@ -15,8 +15,6 @@ UPDATE_DB="n"
 STATUS="n"
 NO_INSTALL_DEPS="n"
 
-DISTRO=""
-OS_VER=""
 PM=""
 
 IPBAN_DIR="/usr/share/ipban"
@@ -88,17 +86,6 @@ validate_inputs() {
 
 # ── OS detection ───────────────────────────────────────────────────────────────
 detect_os() {
-  if [[ -f /etc/os-release ]]; then
-    DISTRO=$(grep -m1 '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr 'A-Z' 'a-z')
-    OS_VER=$(grep -m1 '^VERSION_ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | grep -o '[0-9]*' | head -1)
-  elif [[ -f /etc/system-release ]]; then
-    DISTRO=$(sed 's/ release.*//' /etc/system-release | tr 'A-Z' 'a-z')
-    OS_VER=$(sed 's/.*release //' /etc/system-release | grep -o '[0-9]*' | head -1)
-  else
-    DISTRO="unknown"
-    OS_VER="0"
-  fi
-
   if type yum &>/dev/null || type dnf &>/dev/null; then
     PM="yum"
   else
