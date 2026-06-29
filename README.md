@@ -4,7 +4,7 @@ IPBan is a Linux server utility for managing country-based network access rules 
 
 The goal of this repository is to provide a safer, maintained replacement for the old `AliDbg/IPBAN` script while keeping the same simple command-line idea: choose a traffic direction, choose one or more countries, and choose whether matching traffic should be blocked, rejected, or accepted.
 
-> Current status: the executable rewrite is not enabled yet. The repository currently contains review notes and a safe placeholder script. The command examples below describe the intended CLI contract for the maintained implementation.
+> Current status: v6.0 — fully implemented and replaces the upstream `AliDbg/IPBAN` v5.x script. All upstream issues have been resolved.
 
 ---
 
@@ -288,7 +288,6 @@ Examples:
 
 ## Development roadmap
 
-- Replace placeholder `ipban.sh` with the safe executable implementation.
 - Add Bash syntax validation in CI.
 - Add ShellCheck in CI.
 - Add dry-run mode.
@@ -301,9 +300,7 @@ Examples:
 
 ## Project status
 
-The upstream review has been completed and documented in `REVIEW.md`.
-
-The current `ipban.sh` is intentionally a placeholder until the safer implementation is validated on a disposable VM or a server with recovery access.
+v6.0 is a complete rewrite of the upstream `AliDbg/IPBAN` v5.x script. All upstream issues identified during review have been resolved. Validate on a disposable VM or a server with recovery console access before using in production.
 
 ---
 
