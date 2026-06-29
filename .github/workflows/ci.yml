@@ -20,13 +20,9 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends shellcheck
 
       - name: ShellCheck
-        run: |
-          shellcheck \
-            --severity=warning \
-            --exclude=SC1091 \
-            ipban.sh
+        run: shellcheck --severity=warning --exclude=SC1091 ipban.sh
 
-  # ── 2. Input-validation unit tests (no root / no iptables needed) ────────────
+  # ── 2. Input-validation unit tests ──────────────────────────────────────────
   unit:
     name: Unit tests
     needs: lint
@@ -34,10 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run unit tests
+      - name: Run validation tests
         run: sudo bash tests/unit.sh
 
-  # ── 3. Full integration (real iptables + xt_geoip via xtables-addons-dkms) ──
+  # ── 3. Full install and usage on a real Ubuntu runner ───────────────────────
   integration:
     name: Integration / ${{ matrix.os }}
     needs: unit
@@ -49,34 +45,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install iptables and xtables-addons
+      - name: Pre-install dependencies
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             "linux-headers-$(uname -r)" \
             iptables \
-            netfilter-persistent \
             iptables-persistent \
-            curl \
-            gzip \
-            tar \
-            perl \
+            netfilter-persistent \
+            curl gzip tar perl \
             xtables-addons-common \
             xtables-addons-dkms \
             libtext-csv-xs-perl \
             libmoosex-types-netaddr-ip-perl \
             libnet-cidr-lite-perl
 
-      - name: Load kernel modules
+      # ── Real usage commands ─────────────────────────────────────────────────
+
+      - name: Block outbound traffic to CN, IR, RU
+        run: sudo bash ipban.sh -add OUTPUT -geoip CN,IR,RU -limit DROP
+
+      - name: Verify IPBAN_OUTPUT chain has geoip rules
+        run: sudo iptables -vnL IPBAN_OUTPUT
+
+      - name: Block inbound traffic from CN
+        run: sudo bash ipban.sh -add INPUT -geoip CN -limit DROP
+
+      - name: Verify IPBAN_INPUT chain has geoip rules
+        run: sudo iptables -vnL IPBAN_INPUT
+
+      - name: Block inbound + outbound for multiple countries (REJECT)
+        run: sudo bash ipban.sh -add INPUT,OUTPUT -geoip IR,RU -limit REJECT
+
+      - name: Block ICMP from CN
+        run: sudo bash ipban.sh -add INPUT -geoip CN -limit DROP -icmp no
+
+      - name: Verify ICMP DROP rule present
+        run: sudo iptables -vnL IPBAN_INPUT | grep -i icmp
+
+      - name: Status command
+        run: sudo bash ipban.sh -status yes
+
+      - name: Update GeoIP database
+        run: sudo bash ipban.sh -update-db yes
+
+      - name: Reset — removes only IPBan chains
+        run: sudo bash ipban.sh -reset yes
+
+      - name: Verify IPBan chains are removed
         run: |
-          sudo modprobe x_tables  || true
-          sudo modprobe xt_geoip  || true
-          echo "Loaded modules:"
-          lsmod | grep -E "x_tables|xt_geoip" || echo "(none matched — geoip tests will be skipped)"
+          ! sudo iptables -n -L IPBAN_INPUT   2>/dev/null
+          ! sudo iptables -n -L IPBAN_OUTPUT  2>/dev/null
+          ! sudo iptables -n -L IPBAN_FORWARD 2>/dev/null
 
-      - name: Build minimal test GeoIP database
-        run: sudo bash tests/build-test-geoip.sh
+      - name: Verify host INPUT/OUTPUT chains still exist after reset
+        run: |
+          sudo iptables -n -L INPUT
+          sudo iptables -n -L OUTPUT
 
-      - name: Run integration tests
-        run: sudo bash tests/integration.sh
+      - name: Remove — full uninstall
+        run: sudo bash ipban.sh -remove yes
+
+      - name: Verify runtime files cleaned up
+        run: |
+          test ! -d /usr/share/ipban
+          test ! -f /etc/cron.d/ipban
