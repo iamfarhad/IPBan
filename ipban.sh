@@ -25,9 +25,6 @@ CHAIN_INPUT="IPBAN_INPUT"
 CHAIN_OUTPUT="IPBAN_OUTPUT"
 CHAIN_FORWARD="IPBAN_FORWARD"
 
-# ── Root check ─────────────────────────────────────────────────────────────────
-[[ $EUID -ne 0 ]] && echo "Run as root!" && exit 1
-
 # ── Output helpers ─────────────────────────────────────────────────────────────
 _success() { echo -e "\e[1;42m $* \e[0m"; }
 _error()   { echo -e "\e[1;41m $* \e[0m" >&2; }
@@ -70,6 +67,10 @@ validate_inputs() {
       *) _error "Invalid direction '${dir}'. Must be INPUT, OUTPUT, or FORWARD (or IN, OUT, FWD)."; exit 1 ;;
     esac
   done
+
+  if [[ "$GEOIP" =~ ^, ]] || [[ "$GEOIP" =~ ,$ ]] || [[ "$GEOIP" =~ ,, ]]; then
+    _error "Invalid country code list '${GEOIP}': leading, trailing, or consecutive commas."; exit 1
+  fi
 
   IFS=',' read -ra CODES <<< "$GEOIP"
   for code in "${CODES[@]}"; do
@@ -360,6 +361,7 @@ do_install() {
 
 # ── Uninstall ──────────────────────────────────────────────────────────────────
 do_uninstall() {
+  [[ $EUID -ne 0 ]] && _error "Run as root!" && exit 1
   iptables_reset_ipban
 
   if [[ -f "${IPBAN_DIR}/backup-rules-ipv4.txt" ]]; then
@@ -380,6 +382,7 @@ do_uninstall() {
 do_add() {
   detect_os
   validate_inputs
+  [[ $EUID -ne 0 ]] && _error "Run as root!" && exit 1
 
   if [[ ! -d "${IPBAN_DIR}" ]]; then
     do_install
@@ -395,6 +398,7 @@ do_add() {
 
 # ── Reset ──────────────────────────────────────────────────────────────────────
 do_reset() {
+  [[ $EUID -ne 0 ]] && _error "Run as root!" && exit 1
   iptables_reset_ipban
   save_rules
   _success "IPBan rules removed."
@@ -402,6 +406,7 @@ do_reset() {
 
 # ── Update DB ──────────────────────────────────────────────────────────────────
 do_update_db() {
+  [[ $EUID -ne 0 ]] && _error "Run as root!" && exit 1
   if [[ ! -f "${IPBAN_DIR}/ipban-update.sh" ]]; then
     _error "IPBan is not installed. Run with -add first."; exit 1
   fi
@@ -429,6 +434,7 @@ if [[ "${UPDATE_DB,,}" == "yes" || "${UPDATE_DB,,}" == "y" ]]; then
 fi
 
 if [[ "${STATUS,,}"    == "yes" || "${STATUS,,}"    == "y" ]]; then
+  [[ $EUID -ne 0 ]] && _error "Run as root!" && exit 1
   detect_os; iptables_status; ran=1
 fi
 

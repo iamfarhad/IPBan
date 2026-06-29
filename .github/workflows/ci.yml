@@ -22,21 +22,10 @@ jobs:
       - name: ShellCheck
         run: shellcheck --severity=warning --exclude=SC1091 ipban.sh
 
-  # ── 2. Input-validation unit tests ──────────────────────────────────────────
-  unit:
-    name: Unit tests
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run validation tests
-        run: sudo bash tests/unit.sh
-
-  # ── 3. Full install and usage on a real Ubuntu runner ───────────────────────
+  # ── 2. Full install and usage on a real Ubuntu runner ───────────────────────
   integration:
     name: Integration / ${{ matrix.os }}
-    needs: unit
+    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

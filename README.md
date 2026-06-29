@@ -1,173 +1,180 @@
 # IPBan
 
-IPBan is a Linux server utility for managing country-based network access rules with `iptables` and `xt_geoip`. Choose a traffic direction, choose one or more countries, and choose whether matching traffic should be blocked, rejected, or accepted.
+<p align="center">
+  <a href="https://github.com/iamfarhad/IPBan/actions/workflows/ci.yml">
+    <img src="https://github.com/iamfarhad/IPBan/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+  <img src="https://img.shields.io/badge/version-v1.0.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey?logo=linux" alt="Platform">
+  <img src="https://img.shields.io/badge/bash-4.0%2B-yellow?logo=gnubash" alt="Bash">
+  <img src="https://img.shields.io/badge/iptables-based-orange" alt="iptables">
+</p>
+
+**IPBan** is a Linux firewall utility that blocks or restricts network traffic by country using `iptables` and the `xt_geoip` kernel module. Choose a direction, choose countries, and choose whether to DROP, REJECT, or ACCEPT — all in a single command.
 
 ---
 
 ## Quick start
 
-Run directly from this repository — no download step required:
+Run directly from this repository — no download or installation step required:
 
 ```bash
 sudo bash <(curl -fsSL https://raw.githubusercontent.com/iamfarhad/IPBan/main/ipban.sh) \
   -add OUTPUT -geoip CN,IR,RU -limit DROP
 ```
 
-The command above blocks all outbound traffic to China, Iran, and Russia in a single step. Replace `OUTPUT` with `INPUT` to block inbound traffic, or use `INPUT,OUTPUT,FORWARD` for all directions. See [Usage examples](#usage-examples) for the full option set.
+This blocks all outbound traffic to China, Iran, and Russia in a single step. Replace `OUTPUT` with `INPUT` to block inbound traffic, or use `INPUT,OUTPUT,FORWARD` for all directions.
 
-> **Before blocking inbound traffic:** confirm you have console or recovery access, and that your SSH session originates from an allowed country.
-
----
-
-## Design goals
-
-| Goal | Description |
-| --- | --- |
-| Safe by default | Never flush the whole firewall and never change default policies automatically. |
-| Project-owned rules | Keep all managed rules inside dedicated chains such as `IPBAN_INPUT`, `IPBAN_OUTPUT`, and `IPBAN_FORWARD`. |
-| Reversible changes | Reset removes only IPBan-managed rules. Uninstall does not damage unrelated firewall configuration. |
-| Explicit input | Validate direction, country codes, action targets, and yes/no flags before applying changes. |
-| Production friendly | No runlevel changes, no broad crontab edits, no world-writable directories. |
-| Observable | A status command that clearly shows active IPBan-managed rules. |
-| Persistent | Rules saved in standard persistence locations when the target system supports them. |
+> **Before blocking inbound traffic:** confirm you have console or out-of-band access, and that your SSH session originates from an allowed country.
 
 ---
 
-## How IPBan works
+## Features
 
-IPBan uses the Linux `xt_geoip` module. The high-level flow is:
+- **Country-based firewall rules** — block or restrict traffic by ISO 3166-1 country code using `xt_geoip`
+- **IPv4 and IPv6** — rules apply to both `iptables` and `ip6tables` simultaneously
+- **Project-owned chains** — all rules live in `IPBAN_INPUT`, `IPBAN_OUTPUT`, and `IPBAN_FORWARD`; resetting never touches unrelated firewall rules
+- **Safe reset and uninstall** — removes only IPBan-managed rules; restores your original firewall state on uninstall
+- **Strict input validation** — rejects invalid country codes, directions, and targets before touching the firewall
+- **Auto GeoIP updates** — installs a dedicated cron job (`/etc/cron.d/ipban`) that refreshes the country database daily
+- **Multi-distro support** — Ubuntu, Debian, CentOS Stream, RHEL, and Fedora
+- **One-command install** — auto-detects distro, installs dependencies, builds the GeoIP database, and applies rules
 
-1. Install required packages for `iptables`, `xtables-addons`, and GeoIP database building.
-2. Download a country IP database from a supported public source.
-3. Build the database into the format expected by `xt_geoip`.
-4. Create dedicated IPBan chains for the selected traffic directions.
-5. Attach the IPBan chains to `INPUT`, `OUTPUT`, or `FORWARD` only when requested.
-6. Add country-matching rules into the IPBan chains.
-7. Persist rules so they survive reboot.
-8. Refresh the GeoIP database through a dedicated project cron file.
+---
+
+## How it works
+
+IPBan uses the Linux `xt_geoip` netfilter extension to match packets by country of origin or destination.
+
+```
+curl | ipban.sh
+     │
+     ├─ detect distro (apt / yum)
+     ├─ install iptables + xtables-addons + GeoIP tools
+     ├─ download DB-IP country database
+     ├─ build binary GeoIP database for xt_geoip
+     ├─ create IPBAN_* chains
+     ├─ attach chains to INPUT / OUTPUT / FORWARD
+     ├─ add country-match rules
+     └─ persist rules + schedule daily DB update
+```
 
 ---
 
 ## Supported platforms
 
-- Ubuntu 20.04 and newer
-- Debian 11 and newer
-- CentOS Stream / RHEL-compatible systems where `xtables-addons` is available
-- Fedora-style systems where `xtables-addons` is available
+| Distribution | Versions |
+| --- | --- |
+| Ubuntu | 20.04 LTS, 22.04 LTS, 24.04 LTS |
+| Debian | 11 (Bullseye), 12 (Bookworm) |
+| CentOS Stream | 8, 9 |
+| RHEL-compatible | 8, 9 (AlmaLinux, Rocky Linux) |
+| Fedora | Where `xtables-addons` is available |
 
-Kernel module availability is the most important requirement. If `xt_geoip` cannot be installed or loaded on the server, country-based matching will not work.
+> The `xt_geoip` kernel module must be loadable on the target system. VPS providers that use custom kernels without module support may not be compatible.
 
 ---
 
 ## Requirements
 
-Required system capabilities:
-
 - Root privileges
 - `iptables` and `ip6tables`
-- `xtables-addons` / `xt_geoip`
-- `curl` for database updates
-- `gzip`, `tar`, and basic shell utilities
-- A persistence backend such as `iptables-persistent`, `netfilter-persistent`, or distro-specific iptables services
+- `xtables-addons` / `xt_geoip` kernel module
+- `curl`, `gzip`, `tar`, `perl`
+- A persistence backend: `iptables-persistent` (Debian/Ubuntu) or `iptables-services` (RHEL/CentOS)
 
-Recommended operational requirements:
-
-- Console or recovery access before testing inbound rules
-- A backup of current firewall rules
-- A known-good SSH allow rule before blocking inbound countries
-- A disposable test VM before production rollout
+IPBan installs all of the above automatically unless `--no-install-deps` is passed.
 
 ---
 
-## Actions and options
+## Usage
 
-| Option | Required | Values | Description |
+```bash
+ipban.sh [action] [options]
+```
+
+### Options
+
+| Option | Values | Default | Description |
 | --- | --- | --- | --- |
-| `-add` | For adding rules | `INPUT`, `OUTPUT`, `FORWARD`, or comma-separated list | Selects where country rules are applied. Aliases: `IN`, `OUT`, `FWD`. |
-| `-geoip` | For adding rules | ISO 3166-1 alpha-2 codes | Comma-separated countries such as `CN,IR,RU`. |
-| `-limit` | No | `DROP`, `REJECT`, `ACCEPT` | Target action for matching traffic. Default: `DROP`. |
-| `-icmp` | No | `yes`, `no` | Use `no` to block inbound ICMP/IPv6-ICMP through IPBan-managed rules. |
-| `-reset` | No | `yes` | Remove IPBan-managed rules and chains only. |
-| `-remove` | No | `yes` | Remove IPBan-managed runtime files, cron file, and rules. |
-| `-update-db` | No | `yes` | Download and rebuild the GeoIP database without changing rules. |
-| `-status` | No | `yes` | Print active IPBan-managed chains and rules. |
-| `--no-install-deps` | No | flag | Do not install missing packages automatically; fail with instructions instead. |
+| `-add` | `INPUT`, `OUTPUT`, `FORWARD` | — | Direction(s) to apply rules. Accepts comma-separated list and aliases `IN`, `OUT`, `FWD`. |
+| `-geoip` | ISO 3166-1 codes | `CN,IR,RU` | Countries to match. Comma-separated, e.g. `CN,IR,RU`. |
+| `-limit` | `DROP`, `REJECT`, `ACCEPT` | `DROP` | Action for matching traffic. |
+| `-icmp` | `yes`, `no` | `yes` | Set to `no` to also block ICMP / ICMPv6 from matching countries. |
+| `-reset` | `yes` | — | Remove all IPBan-managed chains and rules only. |
+| `-remove` | `yes` | — | Full uninstall: remove rules, cron, and runtime files. |
+| `-update-db` | `yes` | — | Refresh the GeoIP database without changing rules. |
+| `-status` | `yes` | — | Show active IPBan chains and rules. |
+| `--no-install-deps` | — | — | Fail instead of auto-installing missing packages. |
 
 ---
 
-## Usage examples
+## Examples
 
-### Check current IPBan status
+### Block outbound connections to China, Iran, and Russia
 
 ```bash
-./ipban.sh -status yes
+sudo bash ipban.sh -add OUTPUT -geoip CN,IR,RU -limit DROP
 ```
 
-### Block outbound traffic to selected countries
-
-Useful when you do not want the server to connect to services hosted in specific countries.
+### Block inbound traffic from multiple countries
 
 ```bash
-./ipban.sh -add OUTPUT -geoip CN,IR -limit DROP
+sudo bash ipban.sh -add INPUT -geoip CN,IR,RU -limit DROP
 ```
 
-### Block inbound traffic from selected countries
-
-Use this carefully on remote servers. Make sure your SSH access is not affected.
+### Apply to all directions at once
 
 ```bash
-./ipban.sh -add INPUT -geoip CN,IR,RU -limit DROP
+sudo bash ipban.sh -add INPUT,OUTPUT,FORWARD -geoip CN,IR,RU -limit DROP
 ```
 
 ### Reject instead of silently dropping
 
-`REJECT` sends a rejection response. `DROP` silently discards packets.
-
 ```bash
-./ipban.sh -add INPUT -geoip CN -limit REJECT
+sudo bash ipban.sh -add INPUT -geoip CN -limit REJECT
 ```
 
-### Apply rules to multiple directions
+### Block inbound traffic and ICMP ping from China
 
 ```bash
-./ipban.sh -add INPUT,OUTPUT,FORWARD -geoip CN,IR,RU -limit DROP
+sudo bash ipban.sh -add INPUT -geoip CN -limit DROP -icmp no
 ```
 
-### Block ping through IPBan-managed rules
+### Check active rules
 
 ```bash
-./ipban.sh -add INPUT -geoip CN,IR -limit DROP -icmp no
+sudo bash ipban.sh -status yes
 ```
 
-### Update GeoIP database only
+### Update the GeoIP database without changing rules
 
 ```bash
-./ipban.sh -update-db yes
+sudo bash ipban.sh -update-db yes
 ```
 
-### Reset IPBan rules only
-
-Removes only IPBan-managed chains and jump rules. Does not flush unrelated firewall rules.
+### Remove all IPBan rules (keep other firewall rules intact)
 
 ```bash
-./ipban.sh -reset yes
+sudo bash ipban.sh -reset yes
 ```
 
-### Uninstall IPBan
+### Full uninstall
 
 ```bash
-./ipban.sh -remove yes
+sudo bash ipban.sh -remove yes
 ```
 
 ---
 
-## Traffic direction explained
+## Traffic directions
 
-| Direction | Meaning | Typical use case |
+| Direction | Meaning | Use case |
 | --- | --- | --- |
-| `INPUT` | Traffic coming into the server | Block inbound requests from selected countries. |
-| `OUTPUT` | Traffic leaving the server | Prevent the server from connecting to selected countries. |
-| `FORWARD` | Traffic routed through the server | Gate traffic on router, gateway, proxy, or VPN servers. |
+| `INPUT` | Traffic arriving at the server | Block inbound connections from selected countries |
+| `OUTPUT` | Traffic leaving the server | Prevent the server from reaching selected countries |
+| `FORWARD` | Traffic routed through the server | Use on VPN servers, gateways, and proxies |
 
 ---
 
@@ -175,85 +182,85 @@ Removes only IPBan-managed chains and jump rules. Does not flush unrelated firew
 
 | Target | Behaviour | When to use |
 | --- | --- | --- |
-| `DROP` | Silently discards matching packets | Default blocking behaviour; less information is exposed. |
-| `REJECT` | Refuses matching packets with a response | Useful for debugging or clear network failure signalling. |
-| `ACCEPT` | Allows matching packets | Useful only when you already have a deny-by-default firewall policy. |
-
-`ACCEPT` does not change your server's default firewall policy. Default policies and SSH safety rules should be managed manually and explicitly.
-
----
-
-## Safety checklist before production use
-
-Before applying inbound rules:
-
-1. Confirm you have console or recovery access.
-2. Confirm your current SSH session is from an allowed country.
-3. Back up existing firewall rules.
-4. Add a known-good SSH allow rule outside IPBan.
-5. Test on a disposable VM.
-6. Apply one direction and one country first.
-7. Check status and logs before adding more countries.
-
----
-
-## Persistence model
-
-Rules are persisted through the standard mechanism available on the host system:
-
-- Debian/Ubuntu: `/etc/iptables/rules.v4` and `/etc/iptables/rules.v6` when `iptables-persistent` or `netfilter-persistent` is installed.
-- RHEL/CentOS/Fedora-style systems: `/etc/sysconfig/iptables` and `/etc/sysconfig/ip6tables` via the iptables service.
-
----
-
-## Cron and GeoIP updates
-
-IPBan uses a dedicated cron file at `/etc/cron.d/ipban` to refresh the GeoIP database on a daily schedule. It does not edit the system crontab or remove unrelated entries.
-
----
-
-## File layout
-
-Runtime files:
-
-```text
-/usr/share/ipban/
-  backup-rules-ipv4.txt
-  backup-rules-ipv6.txt
-  download-build-dbip.sh
-  ipban-update.sh
-
-/usr/share/xt_geoip/
-  (binary database files built for xt_geoip)
-
-/etc/cron.d/ipban
-```
+| `DROP` | Silently discards packets | Default; exposes no information about the firewall |
+| `REJECT` | Returns an ICMP error to the sender | Useful for debugging; clients know the connection was refused |
+| `ACCEPT` | Allows packets | Use when your default policy is already DROP/REJECT |
 
 ---
 
 ## Validation
 
-IPBan rejects invalid input before applying any firewall change.
+IPBan validates all input before touching the firewall.
 
-| Input | Result |
+| Invalid input | Error |
 | --- | --- |
-| `-add OUTPUUT` | Error: invalid direction |
-| `-geoip IRAN` | Error: country codes must be two letters |
-| `-geoip IR,us` | Error: lowercase codes are rejected |
-| `-limit BAN` | Error: target must be `DROP`, `REJECT`, or `ACCEPT` |
-| `-icmp maybe` | Error: value must be `yes` or `no` |
+| `-add OUTPUUT` | Invalid direction |
+| `-geoip IRAN` | Country code must be 2 letters |
+| `-geoip CN,` | Trailing comma in country list |
+| `-limit BAN` | Target must be DROP, REJECT, or ACCEPT |
+| `-icmp maybe` | Must be `yes` or `no` |
 
 ---
 
-## Development roadmap
+## Safety checklist
 
-- Add dry-run mode.
-- Add explicit backup and restore commands.
-- Add examples for VPN/gateway use cases.
-- Add nftables support as a future backend.
+Before applying inbound rules on a remote server:
+
+1. Confirm you have console or out-of-band access.
+2. Confirm your SSH session originates from an allowed country.
+3. Back up existing firewall rules.
+4. Add an explicit SSH allow rule outside IPBan.
+5. Test on a disposable VM first.
+6. Start with one direction and one country.
+7. Check `-status yes` before adding more rules.
+
+---
+
+## File layout
+
+```
+/usr/share/ipban/
+  backup-rules-ipv4.txt       original firewall rules (restored on -remove)
+  backup-rules-ipv6.txt
+  download-build-dbip.sh      fetches and builds the GeoIP database
+  ipban-update.sh             called by cron for daily updates
+
+/usr/share/xt_geoip/          binary GeoIP database read by xt_geoip module
+
+/etc/cron.d/ipban             daily GeoIP refresh (project-owned, not crontab)
+
+/etc/iptables/rules.v4        persisted rules (Debian/Ubuntu)
+/etc/iptables/rules.v6
+/etc/sysconfig/iptables       persisted rules (RHEL/CentOS)
+/etc/sysconfig/ip6tables
+```
+
+---
+
+## Persistence
+
+| Distro family | Persistence mechanism |
+| --- | --- |
+| Debian / Ubuntu | `/etc/iptables/rules.v4` and `rules.v6` via `iptables-persistent` |
+| RHEL / CentOS / Fedora | `/etc/sysconfig/iptables` and `ip6tables` via `iptables-services` |
+
+---
+
+## Roadmap
+
+- Dry-run mode (`--dry-run`)
+- Explicit backup and restore commands
+- nftables backend
+- VPN and gateway usage examples
+
+---
+
+## License
+
+MIT
 
 ---
 
 ## Disclaimer
 
-This project changes firewall behaviour. Incorrect rules can interrupt SSH, web traffic, package updates, monitoring, VPN routing, or production services. Use it only when you understand the network path and have a recovery plan.
+This project modifies firewall rules. Misconfigured rules can block SSH, web traffic, monitoring, and other services. Always test on a non-production system first and ensure you have an alternative access method before applying inbound rules.
