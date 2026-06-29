@@ -304,7 +304,9 @@ iptables_status() {
       fi
     done
   done
-  [[ "$found" -eq 0 ]] && _info "No active IPBan chains found."
+  if [[ "$found" -eq 0 ]]; then
+    _info "No active IPBan chains found."
+  fi
 }
 
 # ── Persistence ────────────────────────────────────────────────────────────────
