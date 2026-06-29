@@ -8,6 +8,21 @@ The goal of this repository is to provide a safer, maintained replacement for th
 
 ---
 
+## Quick start
+
+Run directly from this repository — no download step required:
+
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/iamfarhad/IPBan/main/ipban.sh) \
+  -add OUTPUT -geoip CN,IR,RU -limit DROP
+```
+
+The command above blocks all outbound traffic to China, Iran, and Russia in a single step. Replace `OUTPUT` with `INPUT` to block inbound traffic, or use `INPUT,OUTPUT,FORWARD` for all directions. See [Usage examples](#usage-examples) for the full option set.
+
+> **Before blocking inbound traffic:** confirm you have console or recovery access, and that your SSH session originates from an allowed country.
+
+---
+
 ## Why this rewrite exists
 
 The upstream script was useful, but it had several risky behaviours for production servers:
