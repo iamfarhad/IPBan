@@ -20,7 +20,7 @@
 Run directly from this repository — no download or installation step required:
 
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/iamfarhad/IPBan/main/ipban.sh) \
+bash <(curl -fsSL https://raw.githubusercontent.com/iamfarhad/IPBan/main/ipban.sh) \
   -add OUTPUT -geoip CN,IR,RU -limit DROP
 ```
 
@@ -115,55 +115,55 @@ ipban.sh [action] [options]
 ### Block outbound connections to China, Iran, and Russia
 
 ```bash
-sudo bash ipban.sh -add OUTPUT -geoip CN,IR,RU -limit DROP
+bash ipban.sh -add OUTPUT -geoip CN,IR,RU -limit DROP
 ```
 
 ### Block inbound traffic from multiple countries
 
 ```bash
-sudo bash ipban.sh -add INPUT -geoip CN,IR,RU -limit DROP
+bash ipban.sh -add INPUT -geoip CN,IR,RU -limit DROP
 ```
 
 ### Apply to all directions at once
 
 ```bash
-sudo bash ipban.sh -add INPUT,OUTPUT,FORWARD -geoip CN,IR,RU -limit DROP
+bash ipban.sh -add INPUT,OUTPUT,FORWARD -geoip CN,IR,RU -limit DROP
 ```
 
 ### Reject instead of silently dropping
 
 ```bash
-sudo bash ipban.sh -add INPUT -geoip CN -limit REJECT
+bash ipban.sh -add INPUT -geoip CN -limit REJECT
 ```
 
 ### Block inbound traffic and ICMP ping from China
 
 ```bash
-sudo bash ipban.sh -add INPUT -geoip CN -limit DROP -icmp no
+bash ipban.sh -add INPUT -geoip CN -limit DROP -icmp no
 ```
 
 ### Check active rules
 
 ```bash
-sudo bash ipban.sh -status yes
+bash ipban.sh -status yes
 ```
 
 ### Update the GeoIP database without changing rules
 
 ```bash
-sudo bash ipban.sh -update-db yes
+bash ipban.sh -update-db yes
 ```
 
 ### Remove all IPBan rules (keep other firewall rules intact)
 
 ```bash
-sudo bash ipban.sh -reset yes
+bash ipban.sh -reset yes
 ```
 
 ### Full uninstall
 
 ```bash
-sudo bash ipban.sh -remove yes
+bash ipban.sh -remove yes
 ```
 
 ---
